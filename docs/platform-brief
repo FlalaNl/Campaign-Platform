@@ -646,13 +646,3 @@ Op basis van deze brief wordt nu uitgegaan van:
 * **Opslagrichting:** SQLite + portable exports
 * **Toekomstige uitbreidingen:** Characters, Homebrew, Plugins
 * **Bouwstrategie:** eerst de platformbasis beschrijven, daarna de v0.1 module exact specificeren
-
-De logische volgende stap is nu:
-**de v0.1 Event Module Spec** uitschrijven met:
-
-* user stories
-* domeinmodel
-* temporal model
-* database schema
-* UI flows
-* acceptance criteria
