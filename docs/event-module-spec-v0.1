@@ -1,0 +1,1243 @@
+# v0.1 Event Module Spec — Campaign Platform
+
+## 1. Doel
+
+De **Event Module v0.1** is de eerste volledig uitgewerkte module binnen **Campaign Platform**.
+
+Deze module moet één ding goed doen:
+
+**de campaign-tijdlijn betrouwbaar en snel beheren**, met nadruk op:
+
+* dagen
+* gebeurtenissen
+* character-betrokkenheid
+* meerdaagse events
+* ongoing events zonder einddatum
+
+De module moet de gebruiker in staat stellen om:
+
+* dagen te laten verstrijken
+* gebeurtenissen vast te leggen
+* gebeurtenissen te koppelen aan meerdere characters
+* per dag terug te zien wat er gebeurde
+* per character terug te zien wat die heeft meegemaakt
+* lopende events te beheren
+* data te exporteren/importeren zonder lock-in
+
+---
+
+## 2. Scope van v0.1
+
+## In scope
+
+### Tijd en dagen
+
+* campaign current day bijhouden
+* dagen expliciet registreren
+* dagoverzicht tonen
+* dagnotities ondersteunen
+
+### Events
+
+* event aanmaken
+* event bewerken
+* event verwijderen of annuleren
+* single-day events
+* multi-day events
+* ongoing events zonder einddatum
+
+### Character-betrokkenheid
+
+* meerdere characters aan één event koppelen
+* rol per character vastleggen
+* events per character terugvinden
+
+### Overzichten
+
+* day overview
+* active events on day
+* character timeline
+
+### Logging workflow
+
+* advance day
+* daily log wizard
+* shared event logging
+* individual character activity logging
+
+### Data portability
+
+* export naar JSON
+* export naar SQLite snapshot
+* import vanuit JSON
+* schema versioning basis
+
+---
+
+## Buiten scope
+
+Niet in v0.1:
+
+* volledige character manager
+* statblocks
+* homebrew editor
+* faction management als volwaardige module
+* session prep tooling
+* map tooling
+* collaboration/sync
+* user accounts
+* mobile app
+* plugin SDK
+* automation rules engine
+* recurrence engine voor periodieke events
+
+Wel mag v0.1 alvast minimale placeholders bevatten voor:
+
+* location
+* thread
+* faction
+* session
+
+Maar alleen als relationele referenties, niet als uitgewerkte modules.
+
+---
+
+## 3. Kernvragen die de module moet beantwoorden
+
+De module is geslaagd als zij deze vragen betrouwbaar kan beantwoorden:
+
+1. Wat gebeurde op dag X?
+2. Welke events waren actief op dag X?
+3. Welke characters waren betrokken bij event Z?
+4. Welke events heeft character Y meegemaakt?
+5. Welke events lopen nog?
+6. Welke events begonnen vandaag?
+7. Welke events eindigden vandaag?
+8. Welke dag is de huidige campaign-dag?
+9. Welke activiteiten zijn op een dag gelogd zonder dat het losse notities blijven?
+
+---
+
+## 4. Gebruikersrollen in v0.1
+
+Voor v0.1 is er functioneel slechts één rol:
+
+### DM / Campaign Owner
+
+Kan:
+
+* alles aanmaken, bekijken, bewerken, verwijderen, exporteren en importeren
+
+Er is nog geen user/permission model in v0.1.
+
+---
+
+## 5. Functionele user stories
+
+## 5.1 Tijd en dagbeheer
+
+### US-001 — current day instellen
+
+Als DM wil ik een current day kunnen instellen, zodat de campaign een formeel huidig tijdspunt heeft.
+
+**Acceptatie:**
+
+* current day kan handmatig worden gezet
+* current day wordt persistent opgeslagen
+* dagrecord bestaat of wordt aangemaakt
+
+### US-002 — dag laten passeren
+
+Als DM wil ik met één actie naar de volgende dag kunnen gaan, zodat ik snel tijd kan laten verlopen.
+
+**Acceptatie:**
+
+* current day verhoogt met 1
+* nieuwe Day wordt aangemaakt indien nog niet bestaand
+* gebruiker komt in de daily log flow of day view terecht
+
+### US-003 — dagnotitie opslaan
+
+Als DM wil ik per dag notities en een samenvatting kunnen opslaan, zodat de dag context heeft buiten losse events.
+
+**Acceptatie:**
+
+* Day heeft `summary` en `notes`
+* notes kunnen leeg zijn
+* wijzigingen blijven bewaard
+
+---
+
+## 5.2 Events
+
+### US-010 — single-day event aanmaken
+
+Als DM wil ik een event kunnen aanmaken dat op één dag plaatsvindt.
+
+**Acceptatie:**
+
+* `start_day_index` en `end_day_index` kunnen gelijk zijn
+* event verschijnt op day overview van die dag
+* event verschijnt in timelines van gekoppelde characters
+
+### US-011 — multi-day event aanmaken
+
+Als DM wil ik een event kunnen aanmaken dat meerdere dagen duurt.
+
+**Acceptatie:**
+
+* event heeft start- en einddag
+* event is zichtbaar als actief op alle dagen binnen dat bereik
+* event verschijnt bij start- en eindoverzichten correct
+
+### US-012 — ongoing event aanmaken
+
+Als DM wil ik een event kunnen aanmaken zonder bekende einddatum, zodat doorlopende situaties bijgehouden kunnen worden.
+
+**Acceptatie:**
+
+* `end_day_index = null`
+* `temporal_state = ongoing`
+* event blijft actief totdat het handmatig wordt afgesloten of geannuleerd
+
+### US-013 — event afsluiten
+
+Als DM wil ik een ongoing event later kunnen afsluiten door een einddag toe te voegen.
+
+**Acceptatie:**
+
+* ongoing event krijgt einddag
+* state verandert naar `resolved`
+* event is daarna niet langer actief na de einddag
+
+### US-014 — event bewerken
+
+Als DM wil ik bestaande events kunnen wijzigen.
+
+**Acceptatie:**
+
+* titel, beschrijving, deelnemers, start/einddag, locatie, thread en visibility zijn bewerkbaar
+* validaties blijven gelden
+
+### US-015 — event annuleren
+
+Als DM wil ik een event kunnen annuleren zonder het per se hard te verwijderen.
+
+**Acceptatie:**
+
+* event kan status `cancelled` krijgen
+* cancelled events worden standaard niet als actief getoond
+* eventhistorie blijft behouden
+
+---
+
+## 5.3 Character-betrokkenheid
+
+### US-020 — meerdere characters koppelen aan één event
+
+Als DM wil ik meerdere characters aan een event kunnen koppelen.
+
+**Acceptatie:**
+
+* event heeft 0..n participants
+* participant bevat minimaal character-ref en role
+* event komt terug in character timeline
+
+### US-021 — shared event loggen
+
+Als DM wil ik één event voor meerdere characters tegelijk kunnen loggen.
+
+**Acceptatie:**
+
+* in één flow kunnen meerdere characters worden geselecteerd
+* er wordt één event aangemaakt
+* alle gekozen characters worden gekoppeld
+
+### US-022 — individuele characteracties loggen
+
+Als DM wil ik op één dag voor meerdere characters aparte events kunnen loggen.
+
+**Acceptatie:**
+
+* daily log flow ondersteunt meerdere losse eventcreaties op dezelfde dag
+* elk event kan aan één of meer characters gekoppeld worden
+
+### US-023 — rol per character vastleggen
+
+Als DM wil ik per character hun rol in een event kunnen opslaan.
+
+**Acceptatie:**
+
+* per participant is `role` opslaan mogelijk
+* rol is filterbaar/zichtbaar in event detail
+* rol mag initieel uit een beperkte vaste lijst komen
+
+---
+
+## 5.4 Overzichten
+
+### US-030 — dagoverzicht
+
+Als DM wil ik per dag kunnen zien wat er gebeurde.
+
+**Acceptatie:**
+
+* toont events die starten op de dag
+* toont events die actief zijn op de dag
+* toont dagnotitie en samenvatting
+* toont betrokken characters per event
+
+### US-031 — character timeline
+
+Als DM wil ik per character een chronologische lijst van events kunnen zien.
+
+**Acceptatie:**
+
+* toont alle gekoppelde events gesorteerd op startdag
+* geeft rol per event weer
+* ongoing events zijn herkenbaar
+
+### US-032 — actieve events lijst
+
+Als DM wil ik een overzicht van alle lopende events kunnen zien.
+
+**Acceptatie:**
+
+* lijst toont alle events met `ongoing` of events waarvan einddag nog in de toekomst ligt ten opzichte van current day
+* cancelled events worden uitgesloten
+
+---
+
+## 5.5 Import/export
+
+### US-040 — campaign exporteren naar JSON
+
+Als DM wil ik campaign-data naar een portable JSON-bestand exporteren.
+
+**Acceptatie:**
+
+* export bevat schemaVersion
+* export bevat minimaal campaign, days, events, eventParticipants, characters
+* bestand is valideerbaar bij import
+
+### US-041 — campaign importeren uit JSON
+
+Als DM wil ik een eerder geëxporteerde dataset kunnen importeren.
+
+**Acceptatie:**
+
+* import valideert schemaVersion
+* import kan dry-run rapporteren
+* import kan mislukken zonder corrupte partial writes
+
+### US-042 — native database backup
+
+Als DM wil ik een native backup van de datastore kunnen maken.
+
+**Acceptatie:**
+
+* SQLite-bestand of kopie ervan is exporteerbaar
+* restore hoeft in v0.1 nog geen aparte wizard te hebben, maar het formaat moet bruikbaar zijn
+
+---
+
+## 6. Domeinmodel
+
+## 6.1 Overzicht
+
+v0.1 gebruikt de volgende kernobjecten:
+
+* Campaign
+* Calendar
+* Day
+* Character
+* Event
+* EventParticipant
+* Session (optioneel minimaal)
+* Location (optioneel minimaal)
+* Thread (optioneel minimaal)
+
+---
+
+## 6.2 Campaign
+
+### Doel
+
+Container voor alle moduledata.
+
+### Velden
+
+* `id`
+* `name`
+* `calendar_id`
+* `current_day_index`
+* `created_at`
+* `updated_at`
+
+### Regels
+
+* één campaign heeft precies één actieve calendar
+* current day verwijst logisch naar een bestaande of te creëren Day
+
+---
+
+## 6.3 Calendar
+
+### Doel
+
+Definieert hoe een dag intern wordt weergegeven in UI-context.
+
+### v0.1-regel
+
+De bron van waarheid voor tijd is **altijd** `day_index`.
+
+### Velden
+
+* `id`
+* `name`
+* `type` (`custom`, `gregorian`, `forgotten_realms`)
+* `config_json`
+
+### Opmerking
+
+Voor v0.1 hoeft kalenderlogica nog niet volledig dynamisch te zijn, zolang `day_index` maar werkt.
+
+---
+
+## 6.4 Day
+
+### Doel
+
+Expliciet dagrecord binnen een campaign.
+
+### Velden
+
+* `id`
+* `campaign_id`
+* `day_index`
+* `display_label`
+* `summary`
+* `notes`
+* `session_id` nullable
+* `created_at`
+* `updated_at`
+
+### Regels
+
+* `(campaign_id, day_index)` is uniek
+* Day mag bestaan zonder events
+* Day mag automatisch worden gegenereerd
+
+---
+
+## 6.5 Character
+
+### Doel
+
+Vertegenwoordigt een persoon of actor binnen de campaign.
+
+### Velden
+
+* `id`
+* `campaign_id`
+* `name`
+* `kind` (`pc`, `npc`)
+* `status` (`active`, `inactive`, `dead`, `retired`, `unknown`)
+* `description`
+* `faction_id` nullable
+* `metadata_json`
+* `created_at`
+* `updated_at`
+
+### Regels
+
+* Character kan bestaan zonder events
+* Characters worden in v0.1 alleen minimaal beheerd
+* Import van characters mag later uitgebreider worden, maar model moet stabiele IDs toelaten
+
+---
+
+## 6.6 Event
+
+### Doel
+
+Tijdgebonden record van iets dat gebeurd is, gebeurt of gepland/geïnitieerd is.
+
+### Velden
+
+* `id`
+* `campaign_id`
+* `title`
+* `description`
+* `event_type`
+* `start_day_index`
+* `end_day_index` nullable
+* `temporal_state` (`planned`, `ongoing`, `resolved`, `cancelled`)
+* `visibility` (`public`, `dm_only`)
+* `location_id` nullable
+* `thread_id` nullable
+* `parent_event_id` nullable
+* `summary`
+* `created_at`
+* `updated_at`
+
+### Regels
+
+* `start_day_index` is verplicht
+* als `end_day_index != null`, dan geldt `end_day_index >= start_day_index`
+* `parent_event_id` is optioneel en bedoeld voor toekomstige chain/sub-events
+* `cancelled` events zijn historisch zichtbaar maar standaard niet actief
+
+---
+
+## 6.7 EventParticipant
+
+### Doel
+
+Koppelt characters aan events.
+
+### Velden
+
+* `id`
+* `event_id`
+* `character_id`
+* `role` (`participant`, `subject`, `instigator`, `witness`, `target`, `mentioned`)
+* `notes`
+* `is_primary`
+* `created_at`
+
+### Regels
+
+* één event kan meerdere participants hebben
+* één character kan aan meerdere events gekoppeld zijn
+* `(event_id, character_id, role)` hoeft niet per se uniek te zijn, maar dubbele identieke entries moeten in UI ontmoedigd worden
+
+---
+
+## 7. Temporale regels
+
+## 7.1 Bron van waarheid
+
+Tijd wordt intern gerepresenteerd door:
+
+`day_index: integer`
+
+Alles in de Event Module draait hieromheen.
+
+---
+
+## 7.2 Eventtypes in tijd
+
+### Single-day
+
+* `start_day_index = X`
+* `end_day_index = X`
+* meestal `temporal_state = resolved`
+
+### Multi-day
+
+* `start_day_index = X`
+* `end_day_index = Y`
+* `Y > X`
+
+### Ongoing
+
+* `start_day_index = X`
+* `end_day_index = null`
+* `temporal_state = ongoing`
+
+---
+
+## 7.3 Wanneer is een event actief op dag X?
+
+Een event is actief op dag `X` als:
+
+* `start_day_index <= X`
+* en (`end_day_index is null` of `end_day_index >= X`)
+* en `temporal_state != cancelled`
+
+### Gevolg
+
+Dit betekent dat:
+
+* single-day events actief zijn op precies één dag
+* multi-day events actief zijn op alle dagen in hun range
+* ongoing events actief blijven vanaf startdag totdat ze worden afgesloten of geannuleerd
+
+---
+
+## 7.4 Wanneer begint een event op dag X?
+
+Een event begint op dag `X` als:
+
+* `start_day_index == X`
+
+---
+
+## 7.5 Wanneer eindigt een event op dag X?
+
+Een event eindigt op dag `X` als:
+
+* `end_day_index == X`
+* en `temporal_state != cancelled`
+
+---
+
+## 7.6 Afsluiten van ongoing events
+
+Als een ongoing event wordt afgesloten:
+
+* `end_day_index` wordt gezet
+* `temporal_state` wordt `resolved`
+
+---
+
+## 7.7 Ongeldige toestanden
+
+Deze toestanden zijn niet toegestaan:
+
+* `end_day_index < start_day_index`
+* `temporal_state = ongoing` met een einddag die vóór current day ligt zonder expliciete reden
+* event zonder startdag
+* campaign zonder current day
+
+---
+
+## 8. Functionele regels
+
+## 8.1 Day creatie
+
+Een Day-record wordt aangemaakt wanneer:
+
+* current day wordt gezet op een niet-bestaande dag
+* naar een volgende dag wordt gegaan
+* gebruiker expliciet een dag opent/bewerkt
+
+## 8.2 Event zonder participants
+
+v0.1 staat toe dat een event zonder participants bestaat.
+Voorbeeld:
+
+* “Portaalstorm treft Market Ward”
+
+Maar de UI mag participants sterk aanmoedigen.
+
+## 8.3 Character timeline
+
+Een character timeline bevat alle events waar het character via EventParticipant aan gekoppeld is.
+
+## 8.4 Sortering
+
+Standaardsortering:
+
+* primair op `start_day_index`
+* secundair op `created_at`
+
+## 8.5 Soft delete voorkeur
+
+Voor events geldt voorkeur voor:
+
+* `cancelled` of archivering
+  boven hard delete.
+
+Hard delete mag in v0.1 technisch bestaan, maar moet terughoudend worden ingezet.
+
+---
+
+## 9. Querygedrag
+
+De module moet minimaal deze query’s ondersteunen:
+
+### 9.1 GetDayOverview(dayIndex)
+
+Geeft:
+
+* day info
+* events starting on day
+* events active on day
+* events ending on day
+* dagnotities
+
+### 9.2 GetActiveEvents(currentDay)
+
+Geeft:
+
+* alle events actief op current day
+
+### 9.3 GetCharacterTimeline(characterId)
+
+Geeft:
+
+* alle events gekoppeld aan character
+* participant role
+* sortering chronologisch
+
+### 9.4 GetEventDetails(eventId)
+
+Geeft:
+
+* event velden
+* participants
+* linked location/thread refs
+
+### 9.5 SearchEvents(filter)
+
+Minimaal filterbaar op:
+
+* tekst
+* day range
+* character
+* temporal_state
+
+---
+
+## 10. Database schema v0.1
+
+## 10.1 Tabellen
+
+### campaigns
+
+* id
+* name
+* calendar_id
+* current_day_index
+* created_at
+* updated_at
+
+### calendars
+
+* id
+* name
+* type
+* config_json
+* created_at
+* updated_at
+
+### days
+
+* id
+* campaign_id
+* day_index
+* display_label
+* summary
+* notes
+* session_id nullable
+* created_at
+* updated_at
+
+### characters
+
+* id
+* campaign_id
+* name
+* kind
+* status
+* description
+* faction_id nullable
+* metadata_json
+* created_at
+* updated_at
+
+### events
+
+* id
+* campaign_id
+* title
+* description
+* event_type
+* start_day_index
+* end_day_index nullable
+* temporal_state
+* visibility
+* location_id nullable
+* thread_id nullable
+* parent_event_id nullable
+* summary
+* created_at
+* updated_at
+
+### event_participants
+
+* id
+* event_id
+* character_id
+* role
+* notes
+* is_primary
+* created_at
+
+### sessions
+
+Minimal placeholder:
+
+* id
+* campaign_id
+* title
+* real_world_date nullable
+* start_day_index nullable
+* end_day_index nullable
+
+### locations
+
+Minimal placeholder:
+
+* id
+* campaign_id
+* name
+
+### threads
+
+Minimal placeholder:
+
+* id
+* campaign_id
+* name
+
+---
+
+## 10.2 Constraints
+
+### days
+
+* unique `(campaign_id, day_index)`
+
+### events
+
+* check: `end_day_index is null OR end_day_index >= start_day_index`
+* check: `temporal_state in (...)`
+
+### characters
+
+* `kind in ('pc','npc')`
+* `status in (...)`
+
+### event_participants
+
+* FK naar events
+* FK naar characters
+
+---
+
+## 10.3 Indexen
+
+### Aanbevolen indexen
+
+* `days(campaign_id, day_index)`
+* `events(campaign_id, start_day_index)`
+* `events(campaign_id, end_day_index)`
+* `events(campaign_id, temporal_state)`
+* `event_participants(event_id)`
+* `event_participants(character_id)`
+
+Deze zijn nodig voor:
+
+* day overviews
+* active events
+* character timelines
+
+---
+
+## 11. JSON import/export contract v0.1
+
+## 11.1 Exportbestand moet bevatten
+
+```json
+{
+  "schemaVersion": "1.0.0",
+  "appVersion": "x.y.z",
+  "exportedAt": "ISO_TIMESTAMP",
+  "campaign": {},
+  "calendars": [],
+  "days": [],
+  "characters": [],
+  "events": [],
+  "eventParticipants": [],
+  "sessions": [],
+  "locations": [],
+  "threads": []
+}
+```
+
+## 11.2 Vereisten
+
+* `schemaVersion` verplicht
+* IDs moeten stabiel zijn
+* referenties moeten valide zijn of als import error/warning worden gerapporteerd
+
+## 11.3 Importmodi
+
+v0.1 mag twee importmodi ondersteunen:
+
+### Replace import
+
+* bestaande dataset vervangen
+
+### New campaign import
+
+* als nieuwe campaign importeren
+
+Merge-import is wenselijk later, maar geen harde eis voor v0.1.
+
+---
+
+## 12. UI flows v0.1
+
+## 12.1 Dashboard
+
+Toont:
+
+* campaign name
+* current day
+* actieve events
+* recente events
+* snelle knoppen:
+
+  * advance day
+  * log event
+  * open current day
+
+---
+
+## 12.2 Advance Day flow
+
+### Stap 1
+
+Gebruiker kiest “Advance Day”
+
+### Stap 2
+
+System:
+
+* verhoogt current day met 1
+* maakt nieuwe Day indien nodig
+
+### Stap 3
+
+Open **Daily Log Wizard**
+
+---
+
+## 12.3 Daily Log Wizard
+
+### Doel
+
+Snelle invoer van wat op een dag is gebeurd.
+
+### Stap 1 — dagcontext
+
+Toon:
+
+* current day
+* daglabel
+* bestaande dagnotitie
+* actieve events die al liepen
+
+### Stap 2 — character selectie
+
+Toon lijst bestaande characters:
+
+* checkbox/select
+* optie “nieuw character toevoegen”
+
+### Stap 3 — logging mode
+
+Gebruiker kiest:
+
+* **shared event**
+* **individual actions**
+* **skip for now**
+
+### Shared event flow
+
+Velden:
+
+* titel
+* beschrijving
+* participants
+* role per participant
+* start/eind of ongoing
+* location optional
+* thread optional
+* visibility
+
+### Individual actions flow
+
+Voor elk geselecteerd character:
+
+* nieuw event toevoegen
+* of bestaand event koppelen
+* korte beschrijving
+* rol
+
+### Stap 4 — bevestigen
+
+Overzicht van wat aangemaakt wordt
+
+### Stap 5 — opslaan
+
+System schrijft:
+
+* events
+* participant links
+* day summary updates indien ingevoerd
+
+---
+
+## 12.4 Day View
+
+Toont:
+
+* day label
+* summary
+* notes
+* events that start today
+* active events on this day
+* events ending today
+* button “add event”
+* button “edit day”
+
+---
+
+## 12.5 Event Editor
+
+Velden:
+
+* title
+* summary
+* description
+* event_type
+* start_day_index
+* end_day_index optional
+* ongoing toggle
+* temporal_state
+* visibility
+* participants
+* location optional
+* thread optional
+* parent event optional
+
+Validaties:
+
+* startdag verplicht
+* einddag niet vóór startdag
+* ongoing => einddag leeg
+
+---
+
+## 12.6 Character Timeline View
+
+Toont:
+
+* character summary
+* alle gekoppelde events chronologisch
+* rol per event
+* filters:
+
+  * all
+  * only ongoing
+  * day range
+
+---
+
+## 13. Commands / application use cases
+
+v0.1 moet minimaal deze use cases hebben:
+
+* `createCampaign`
+* `setCurrentDay`
+* `advanceDay`
+* `getOrCreateDay`
+* `updateDay`
+* `createCharacter`
+* `createEvent`
+* `updateEvent`
+* `cancelEvent`
+* `closeOngoingEvent`
+* `attachParticipantToEvent`
+* `bulkCreateSharedEvent`
+* `bulkCreateIndividualDayEvents`
+* `getDayOverview`
+* `getActiveEventsForDay`
+* `getCharacterTimeline`
+* `exportCampaignAsJson`
+* `importCampaignFromJson`
+* `exportNativeSnapshot`
+
+---
+
+## 14. Validatieregels
+
+## 14.1 Event-validatie
+
+* titel verplicht
+* startdag verplicht
+* einddag mag null zijn
+* als einddag gevuld is: niet kleiner dan startdag
+* ongoing en ingevulde einddag mogen niet tegelijk zonder expliciete state-conversie
+
+## 14.2 Participant-validatie
+
+* character moet bestaan
+* event moet bestaan
+* role moet geldige enum zijn
+
+## 14.3 Campaign-validatie
+
+* current day moet integer zijn
+* calendar moet bestaan
+* day records mogen niet dupliceren op `(campaign_id, day_index)`
+
+## 14.4 Import-validatie
+
+* schemaVersion bekend
+* referentiële integriteit checken
+* ongeldige records blokkeren of rapporteren
+
+---
+
+## 15. Niet-functionele eisen
+
+## 15.1 Local-first
+
+Alles in v0.1 moet werken zonder internet of server.
+
+## 15.2 Snelheid
+
+Normale queries voor:
+
+* day overview
+* character timeline
+* active events
+  moeten direct aanvoelen voor een typische campaigndataset.
+
+## 15.3 Portability
+
+Data moet exporteerbaar zijn zonder verlies van kerninformatie.
+
+## 15.4 Evolvability
+
+Schema en code moeten ruimte laten voor:
+
+* Character Module
+* Homebrew Module
+* plugin hooks
+* latere web/server-adapters
+
+## 15.5 Betrouwbaarheid
+
+Import mag geen half-corrupte writes veroorzaken.
+
+---
+
+## 16. Openstaande ontwerpkeuzes voor later, maar niet blocker voor v0.1
+
+Deze hoeven niet volledig beslist te zijn om v0.1 te bouwen:
+
+* uitgebreid kalendermodel
+* sessions als volwaardige module
+* relationele links naar factions
+* merge-import strategie
+* richer event typing
+* event tagging system
+* attachments/media
+* audit log/version history
+
+---
+
+## 17. Acceptatiecriteria op moduleniveau
+
+De Event Module v0.1 is klaar wanneer:
+
+1. een campaign een current day heeft;
+2. de gebruiker dagen kan laten passeren;
+3. day records automatisch ontstaan waar nodig;
+4. single-day, multi-day en ongoing events aangemaakt kunnen worden;
+5. één event aan meerdere characters gekoppeld kan worden;
+6. per character een timeline bekeken kan worden;
+7. per dag een overzicht bekeken kan worden;
+8. actieve events correct berekend worden;
+9. ongoing events later afgesloten kunnen worden;
+10. data naar JSON geëxporteerd en weer geïmporteerd kan worden;
+11. een native datastore-backup mogelijk is;
+12. de kernlogica los staat van UI en concrete storage-implementatie.
+
+---
+
+## 18. Testscenario’s voor v0.1
+
+## Scenario 1 — simple day logging
+
+* campaign current day = 10
+* gebruiker voegt single-day event toe op dag 10
+* event verschijnt in day overview van dag 10
+
+## Scenario 2 — shared event
+
+* event op dag 12
+* drie characters gekoppeld
+* event verschijnt in alle drie timelines
+
+## Scenario 3 — multi-day event
+
+* start 20, einde 24
+* event actief op 20, 21, 22, 23, 24
+* niet actief op 25
+
+## Scenario 4 — ongoing event
+
+* start 30, eind null, state ongoing
+* event blijft zichtbaar als actief op 31, 32, 33
+* na afsluiten op 35 is het niet actief op 36
+
+## Scenario 5 — character actions in daily wizard
+
+* current day wordt verhoogd
+* gebruiker logt 4 aparte character events
+* alle events staan op dezelfde dag, met juiste participants
+
+## Scenario 6 — import/export round trip
+
+* export dataset
+* importeer in nieuwe campaign
+* day overviews en timelines blijven functioneel identiek
+
+---
+
+## 19. Bouwvolgorde voor Codex
+
+De eerste build-sprint voor Codex moet alleen dit doen:
+
+### Sprint 1
+
+* project scaffold
+* database schema
+* migrations
+* core domain types
+* createCampaign / setCurrentDay / advanceDay
+* day CRUD
+* character CRUD minimal
+* event CRUD minimal
+* participant linking
+
+### Sprint 2
+
+* day overview
+* active event logic
+* character timeline
+* daily log wizard
+* close ongoing event
+
+### Sprint 3
+
+* JSON export/import
+* validation
+* native snapshot export
+* polish + tests
+
+---
+
+## 20. Formele definitie van v0.1
+
+**Event Module v0.1** is een local-first module binnen Campaign Platform die campaign-tijd modelleert via day indices, gebeurtenissen opslaat als tijdgebonden records, character-betrokkenheid relationeel koppelt aan die records, en snelle retrieval biedt via dagoverzichten, actieve-eventlijsten en character timelines, met ondersteuning voor single-day, multi-day en open-ended ongoing events, plus basisimport/export voor data-portability.
+
+---
