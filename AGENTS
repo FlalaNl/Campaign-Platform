@@ -1,0 +1,477 @@
+# AGENTS.md
+
+## Purpose
+
+This repository contains the design and implementation of **Campaign Platform**.
+
+Campaign Platform is a **local-first, extensible campaign management platform** for tabletop RPGs and long-running narrative projects.
+
+The first implemented vertical slice is:
+
+**Event & Timeline Module v0.1**
+
+This repository should be treated as a **domain-first software project**, not as a prototype UI playground.
+
+---
+
+## Primary objective
+
+Build a stable foundation for a campaign platform that can grow over time.
+
+The current implementation target is intentionally narrow:
+
+- campaigns
+- calendars
+- days
+- events
+- event participants
+- character timelines
+- JSON import/export
+- native SQLite snapshot support
+
+Even though the first release is limited to events and timelines, all implementation decisions should preserve room for future modules such as:
+
+- characters
+- homebrew
+- sessions
+- locations
+- factions
+- threads
+- plugins
+- server/web deployment
+
+---
+
+## Non-negotiable project principles
+
+### 1. Domain-first
+Business rules, domain entities, and use cases come before UI convenience.
+
+Do not bury core logic in React components, Tauri commands, or database helpers.
+
+### 2. Separation of concerns
+Keep the following layers cleanly separated:
+
+- **Domain**: pure types and rules
+- **Application**: use cases and orchestration
+- **Persistence**: SQLite / Drizzle / repository implementations
+- **Interface**: desktop UI
+- **Integration**: import/export and future adapters
+
+### 3. Local-first
+The app must fully work without internet or a hosted backend.
+
+### 4. Server-capable
+Do not design the app in a way that blocks a future migration to a server/API/web architecture.
+
+### 5. Import/export-first
+Data portability is a core requirement, not an afterthought.
+
+### 6. Modular growth
+Do not hardcode assumptions that only make sense for the Event Module if they would make future modules harder to add.
+
+### 7. Obsidian-agnostic
+Do not assume Obsidian is the primary storage model or system boundary.
+
+### 8. Prefer explicitness over magic
+Use clear domain types, explicit DTOs, and readable repository boundaries.
+
+---
+
+## Authoritative documents
+
+Before making significant architecture decisions, consult these files:
+
+- `README.md`
+- `docs/platform-brief.md`
+- `docs/event-module-spec-v0.1.md`
+- `docs/implementation-brief-v0.1.md`
+
+If implementation details conflict with these docs, prefer the docs unless there is a clear technical error.
+
+If you discover a real conflict or ambiguity:
+- do not silently invent a new direction
+- keep the implementation conservative
+- leave a clear note in code comments or a follow-up summary
+
+---
+
+## Current implementation target
+
+The current target is **Event Module v0.1**.
+
+### In scope
+- campaigns
+- calendars
+- days
+- characters (minimal)
+- events
+- event participants
+- current day
+- advance day
+- day overview
+- character timeline
+- active-event retrieval
+- JSON import/export
+- SQLite snapshot export
+
+### Out of scope
+Do not proactively implement these unless explicitly requested:
+- sync
+- collaboration
+- auth
+- mobile support
+- plugin runtime
+- marketplace
+- maps
+- statblocks
+- homebrew editors
+- recurrence engine
+- cloud features
+- multiplayer workflows
+
+---
+
+## Temporal model rules
+
+The temporal source of truth is:
+
+`day_index: integer`
+
+This must remain central in the implementation.
+
+### Supported event forms
+- **single-day**: `start_day_index == end_day_index`
+- **multi-day**: `start_day_index < end_day_index`
+- **ongoing**: `end_day_index == null` and `temporal_state == "ongoing"`
+
+### Active-on-day rule
+An event is active on day `X` if:
+
+- `start_day_index <= X`
+- and (`end_day_index is null` or `end_day_index >= X`)
+- and `temporal_state != "cancelled"`
+
+Do not replace this with date libraries or calendar-specific abstractions in the core domain.
+
+---
+
+## Storage rules
+
+### Primary datastore
+Use **SQLite** for v0.1.
+
+### ORM / schema tooling
+Use **Drizzle** for schema and migrations unless explicitly instructed otherwise.
+
+### Storage abstraction
+Repositories must sit between application logic and persistence.
+
+Application/use-case code must not directly depend on raw SQL calls.
+
+### Database naming conventions
+Use:
+- `snake_case` in database schema
+- `camelCase` in TypeScript code
+
+### IDs
+Use string IDs with stable prefixes, such as:
+- `cmp_`
+- `cal_`
+- `day_`
+- `chr_`
+- `evt_`
+- `evp_`
+
+Do not use auto-increment integers as public entity identity.
+
+---
+
+## Validation rules
+
+Use **Zod** for input/import/export validation.
+
+Validation must happen before writes in application-layer workflows.
+
+At minimum, validate:
+- create/update event input
+- create character input
+- export/import envelope
+- import mode and schema version
+
+Do not rely solely on UI validation.
+
+---
+
+## Error handling rules
+
+Avoid unstructured throw/catch chaos.
+
+Prefer explicit error types, such as:
+- `ValidationError`
+- `NotFoundError`
+- `ConflictError`
+- `ImportError`
+
+Use these consistently in the application layer.
+
+---
+
+## Transaction rules
+
+Use a transaction boundary for operations that write multiple related records.
+
+Examples:
+- create event + participants
+- import campaign package
+- create campaign + calendar + initial day
+- advance day + create missing day
+
+Do not allow partial writes for these flows.
+
+---
+
+## Repository rules
+
+Repository interfaces are part of the architecture and must remain stable.
+
+Implement repository interfaces for:
+- campaigns
+- calendars
+- days
+- characters
+- events
+- event participants
+
+Do not let UI code or Tauri command handlers talk directly to Drizzle tables.
+
+---
+
+## UI rules
+
+The UI is important, but it is not the primary source of architecture decisions.
+
+### UI should consume:
+- application use cases
+- read models / DTOs
+
+### UI should not contain:
+- core business rules
+- event active-state logic
+- direct storage logic
+- import/export parsing logic
+
+Keep the first UI intentionally simple and task-oriented.
+
+The first priority is correctness of flows, not visual polish.
+
+---
+
+## Import/export rules
+
+Import/export is a first-class system boundary.
+
+### Required export formats
+- portable JSON export
+- native SQLite snapshot export
+
+### JSON export requirements
+The export must include:
+- `schemaVersion`
+- `appVersion`
+- `exportedAt`
+- campaign data
+- related entity data needed for reconstruction
+
+### Import behavior
+Prefer safe import behavior:
+- validate first
+- fail clearly
+- avoid partial corrupt writes
+
+If full merge behavior is not yet specified, support:
+- `replace`
+- `new_campaign`
+
+Do not invent complex merge logic unless explicitly requested.
+
+---
+
+## Testing expectations
+
+Prefer targeted automated tests around domain rules and use cases.
+
+High-value tests include:
+- create campaign
+- advance day
+- create single-day event
+- create multi-day event
+- create ongoing event
+- close ongoing event
+- get day overview
+- get character timeline
+- export/import roundtrip
+
+If time is limited, prioritize:
+1. domain rule tests
+2. use case tests
+3. repository integration tests
+
+---
+
+## Implementation priorities
+
+When choosing what to build first, use this order:
+
+1. domain types and rules
+2. persistence schema and migrations
+3. repository implementations
+4. application use cases
+5. read models / queries
+6. import/export
+7. desktop UI
+
+Do not start by building a polished UI while the domain model is still unstable.
+
+---
+
+## How to behave when implementing
+
+### Prefer small, coherent steps
+Make progress in narrow vertical increments.
+
+### Do not over-generalize too early
+Avoid speculative abstraction unless it clearly supports known future requirements from the docs.
+
+### But also do not hardcode the Event Module into the whole platform
+Design for future modules without trying to build all of them now.
+
+### Preserve future portability
+When unsure between a shortcut and a design that preserves data portability and clean boundaries, prefer the latter.
+
+### Leave clean seams
+It should be possible later to:
+- add a web client
+- add a server API
+- add a Character Module
+- add a Homebrew Module
+- add import/export adapters
+without rewriting the entire core
+
+---
+
+## File and code organization rules
+
+### Prefer
+- small files with clear ownership
+- explicit exports
+- feature/use-case oriented structure
+- domain names that match the docs
+
+### Avoid
+- giant utility files
+- dumping business logic into `index.ts`
+- circular dependencies between packages
+- hidden cross-layer imports
+
+### Dependency direction
+Allowed direction is roughly:
+
+- `apps/desktop` -> `packages/application`
+- `packages/application` -> `packages/domain`
+- `packages/db` -> `packages/domain` and application contracts
+- `packages/import-export` -> `packages/domain`, `packages/application`, `packages/schemas`
+- `packages/domain` -> no UI or DB dependencies
+
+Do not invert this direction.
+
+---
+
+## Preferred coding style
+
+### TypeScript
+- prefer explicit types at public boundaries
+- use discriminated unions where useful
+- avoid `any`
+- keep DTOs explicit
+- keep domain objects simple and predictable
+
+### Naming
+- use clear names over clever names
+- use full words rather than vague abbreviations
+- keep terms aligned with docs:
+  - campaign
+  - calendar
+  - day
+  - event
+  - event participant
+  - character
+  - timeline
+  - day overview
+
+### Comments
+Comment intent where useful, not obvious syntax.
+
+Do not add noisy comments that repeat the code.
+
+---
+
+## What not to do
+
+Do not:
+- redesign the product scope silently
+- replace the temporal model
+- move business rules into the UI
+- bypass repositories
+- invent cloud dependencies
+- assume online-only behavior
+- lock data into a proprietary format
+- overbuild future plugin infrastructure in v0.1
+- add unrelated features because they seem useful
+
+---
+
+## If the task is ambiguous
+
+When a requested implementation detail is ambiguous:
+
+1. follow the platform and module docs
+2. prefer the simplest implementation that preserves future extensibility
+3. avoid introducing new architecture without necessity
+4. make a minimal, well-reasoned choice
+5. surface the assumption clearly in your summary
+
+---
+
+## Definition of done for v0.1-aligned work
+
+A change is aligned with the project only if it preserves:
+
+- local-first behavior
+- day-index based time modeling
+- modular architecture
+- clean layer separation
+- repository boundaries
+- import/export portability
+- future server-capable design
+
+If a change improves short-term convenience but weakens these principles, do not choose it by default.
+
+---
+
+## Final instruction
+
+Treat this repository as the foundation of a long-lived campaign platform.
+
+Optimize for:
+- correctness
+- explicitness
+- maintainability
+- portability
+- extensibility
+
+Do not optimize for:
+- flashy demos
+- premature breadth
+- framework-driven architecture
+- shortcuts that make future modules harder
