@@ -1,0 +1,9 @@
+export type CampaignId = string;
+export type CalendarId = string;
+export type DayId = string;
+export type CharacterId = string;
+export type EventId = string;
+export type EventParticipantId = string;
+export type SessionId = string;
+export type LocationId = string;
+export type ThreadId = string;

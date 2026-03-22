@@ -1,0 +1,12 @@
+{
+  "name": "@campaign-platform/application",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@campaign-platform/domain": "workspace:*",
+    "zod": "^4.1.11"
+  }
+}
