@@ -1,0 +1,1219 @@
+# Implementation Brief — Event Module v0.1
+
+## 1. Doel van dit document
+
+Dit document vertaalt de **Platform Brief** en de **Event Module Spec** naar een concrete technische basis voor implementatie met Codex.
+
+Dit document definieert:
+
+* projectstructuur
+* domeinmodellen
+* database-ontwerp
+* repository-interfaces
+* application services
+* DTO’s/query-contracts
+* validatieregels
+* import/exportcontracten
+* bouwvolgorde
+
+Dit document is leidend voor v0.1.
+
+---
+
+## 2. Architectuurkeuze voor v0.1
+
+We bouwen v0.1 als een **local-first desktop app** met een architectuur die later ook een web/server-variant toelaat.
+
+## 2.1 Lagen
+
+### Domain
+
+Pure businesslogica, types en regels.
+
+### Application
+
+Use cases en workflows.
+
+### Persistence
+
+SQLite-schema, migrations, repositories.
+
+### Interface
+
+Desktop UI.
+
+### Integration
+
+Import/export.
+
+---
+
+## 3. Monorepo-structuur
+
+```text
+campaign-platform/
+  apps/
+    desktop/
+      src/
+        app/
+        pages/
+        widgets/
+        features/
+      src-tauri/
+      package.json
+      vite.config.ts
+
+  packages/
+    domain/
+      src/
+        ids.ts
+        enums.ts
+        types/
+        rules/
+        index.ts
+
+    application/
+      src/
+        use-cases/
+        dto/
+        services/
+        index.ts
+
+    db/
+      src/
+        schema/
+        repositories/
+        client/
+        migrations/
+        index.ts
+
+    schemas/
+      src/
+        zod/
+        json-schema/
+        index.ts
+
+    import-export/
+      src/
+        exporters/
+        importers/
+        mappers/
+        index.ts
+
+    shared/
+      src/
+        result.ts
+        errors.ts
+        dates.ts
+        utils.ts
+        index.ts
+
+  docs/
+    platform-brief.md
+    event-module-spec-v0.1.md
+    implementation-brief-v0.1.md
+
+  package.json
+  pnpm-workspace.yaml
+  tsconfig.base.json
+```
+
+## 3.1 Regels
+
+* `packages/domain` mag niets weten van SQLite, Tauri of React.
+* `packages/application` mag niets weten van UI.
+* `packages/db` implementeert interfaces uit `application` of `domain`.
+* `apps/desktop` praat alleen met application use cases.
+
+---
+
+## 4. Domeinmodel
+
+## 4.1 ID-strategie
+
+Gebruik string IDs met prefixen.
+Niet auto-increment als primaire publieke identity.
+
+Voorbeelden:
+
+* `cmp_...`
+* `cal_...`
+* `day_...`
+* `chr_...`
+* `evt_...`
+* `evp_...`
+
+Dat maakt import/export en merges later veel makkelijker.
+
+## 4.2 TypeScript domeintypes
+
+```ts
+export type CampaignId = string;
+export type CalendarId = string;
+export type DayId = string;
+export type CharacterId = string;
+export type EventId = string;
+export type EventParticipantId = string;
+export type SessionId = string;
+export type LocationId = string;
+export type ThreadId = string;
+```
+
+---
+
+## 5. Enums
+
+```ts
+export type CalendarType = "custom" | "gregorian" | "forgotten_realms";
+
+export type CharacterKind = "pc" | "npc";
+
+export type CharacterStatus =
+  | "active"
+  | "inactive"
+  | "dead"
+  | "retired"
+  | "unknown";
+
+export type EventTemporalState =
+  | "planned"
+  | "ongoing"
+  | "resolved"
+  | "cancelled";
+
+export type EventVisibility = "public" | "dm_only";
+
+export type EventParticipantRole =
+  | "participant"
+  | "subject"
+  | "instigator"
+  | "witness"
+  | "target"
+  | "mentioned";
+```
+
+---
+
+## 6. Core entities
+
+## 6.1 Campaign
+
+```ts
+export interface Campaign {
+  id: CampaignId;
+  name: string;
+  calendarId: CalendarId;
+  currentDayIndex: number;
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+## 6.2 Calendar
+
+```ts
+export interface Calendar {
+  id: CalendarId;
+  name: string;
+  type: CalendarType;
+  configJson: string; // serialized JSON for now
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+## 6.3 Day
+
+```ts
+export interface Day {
+  id: DayId;
+  campaignId: CampaignId;
+  dayIndex: number;
+  displayLabel: string | null;
+  summary: string | null;
+  notes: string | null;
+  sessionId: SessionId | null;
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+## 6.4 Character
+
+```ts
+export interface Character {
+  id: CharacterId;
+  campaignId: CampaignId;
+  name: string;
+  kind: CharacterKind;
+  status: CharacterStatus;
+  description: string | null;
+  factionId: string | null;
+  metadataJson: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+## 6.5 Event
+
+```ts
+export interface Event {
+  id: EventId;
+  campaignId: CampaignId;
+  title: string;
+  summary: string | null;
+  description: string | null;
+  eventType: string | null;
+  startDayIndex: number;
+  endDayIndex: number | null;
+  temporalState: EventTemporalState;
+  visibility: EventVisibility;
+  locationId: LocationId | null;
+  threadId: ThreadId | null;
+  parentEventId: EventId | null;
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+## 6.6 EventParticipant
+
+```ts
+export interface EventParticipant {
+  id: EventParticipantId;
+  eventId: EventId;
+  characterId: CharacterId;
+  role: EventParticipantRole;
+  notes: string | null;
+  isPrimary: boolean;
+  createdAt: string;
+}
+```
+
+## 6.7 Minimal placeholders
+
+```ts
+export interface Session {
+  id: SessionId;
+  campaignId: CampaignId;
+  title: string;
+  realWorldDate: string | null;
+  startDayIndex: number | null;
+  endDayIndex: number | null;
+}
+
+export interface Location {
+  id: LocationId;
+  campaignId: CampaignId;
+  name: string;
+}
+
+export interface Thread {
+  id: ThreadId;
+  campaignId: CampaignId;
+  name: string;
+}
+```
+
+---
+
+## 7. Domain rules
+
+## 7.1 Event active-on-day rule
+
+```ts
+export function isEventActiveOnDay(event: Event, dayIndex: number): boolean {
+  if (event.temporalState === "cancelled") return false;
+  if (event.startDayIndex > dayIndex) return false;
+  if (event.endDayIndex === null) return true;
+  return event.endDayIndex >= dayIndex;
+}
+```
+
+## 7.2 Event starts-on-day rule
+
+```ts
+export function doesEventStartOnDay(event: Event, dayIndex: number): boolean {
+  return event.startDayIndex === dayIndex;
+}
+```
+
+## 7.3 Event ends-on-day rule
+
+```ts
+export function doesEventEndOnDay(event: Event, dayIndex: number): boolean {
+  if (event.temporalState === "cancelled") return false;
+  return event.endDayIndex === dayIndex;
+}
+```
+
+## 7.4 Event validation rule
+
+```ts
+export function validateEventTemporalShape(input: {
+  startDayIndex: number;
+  endDayIndex: number | null;
+  temporalState: EventTemporalState;
+}): string[] {
+  const errors: string[] = [];
+
+  if (!Number.isInteger(input.startDayIndex)) {
+    errors.push("startDayIndex must be an integer");
+  }
+
+  if (input.endDayIndex !== null && input.endDayIndex < input.startDayIndex) {
+    errors.push("endDayIndex cannot be before startDayIndex");
+  }
+
+  if (input.temporalState === "ongoing" && input.endDayIndex !== null) {
+    errors.push("ongoing events cannot have an endDayIndex");
+  }
+
+  return errors;
+}
+```
+
+---
+
+## 8. Database schema
+
+## 8.1 SQL DDL
+
+```sql
+CREATE TABLE campaigns (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  calendar_id TEXT NOT NULL,
+  current_day_index INTEGER NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (calendar_id) REFERENCES calendars(id)
+);
+
+CREATE TABLE calendars (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  type TEXT NOT NULL CHECK (type IN ('custom', 'gregorian', 'forgotten_realms')),
+  config_json TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE days (
+  id TEXT PRIMARY KEY,
+  campaign_id TEXT NOT NULL,
+  day_index INTEGER NOT NULL,
+  display_label TEXT,
+  summary TEXT,
+  notes TEXT,
+  session_id TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE,
+  FOREIGN KEY (session_id) REFERENCES sessions(id),
+  UNIQUE (campaign_id, day_index)
+);
+
+CREATE TABLE characters (
+  id TEXT PRIMARY KEY,
+  campaign_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('pc', 'npc')),
+  status TEXT NOT NULL CHECK (status IN ('active', 'inactive', 'dead', 'retired', 'unknown')),
+  description TEXT,
+  faction_id TEXT,
+  metadata_json TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE
+);
+
+CREATE TABLE locations (
+  id TEXT PRIMARY KEY,
+  campaign_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE
+);
+
+CREATE TABLE threads (
+  id TEXT PRIMARY KEY,
+  campaign_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE
+);
+
+CREATE TABLE sessions (
+  id TEXT PRIMARY KEY,
+  campaign_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  real_world_date TEXT,
+  start_day_index INTEGER,
+  end_day_index INTEGER,
+  FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE
+);
+
+CREATE TABLE events (
+  id TEXT PRIMARY KEY,
+  campaign_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  summary TEXT,
+  description TEXT,
+  event_type TEXT,
+  start_day_index INTEGER NOT NULL,
+  end_day_index INTEGER,
+  temporal_state TEXT NOT NULL CHECK (temporal_state IN ('planned', 'ongoing', 'resolved', 'cancelled')),
+  visibility TEXT NOT NULL CHECK (visibility IN ('public', 'dm_only')),
+  location_id TEXT,
+  thread_id TEXT,
+  parent_event_id TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE,
+  FOREIGN KEY (location_id) REFERENCES locations(id),
+  FOREIGN KEY (thread_id) REFERENCES threads(id),
+  FOREIGN KEY (parent_event_id) REFERENCES events(id),
+  CHECK (end_day_index IS NULL OR end_day_index >= start_day_index),
+  CHECK (
+    NOT (
+      temporal_state = 'ongoing' AND end_day_index IS NOT NULL
+    )
+  )
+);
+
+CREATE TABLE event_participants (
+  id TEXT PRIMARY KEY,
+  event_id TEXT NOT NULL,
+  character_id TEXT NOT NULL,
+  role TEXT NOT NULL CHECK (role IN ('participant', 'subject', 'instigator', 'witness', 'target', 'mentioned')),
+  notes TEXT,
+  is_primary INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
+  FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE
+);
+```
+
+## 8.2 Indexen
+
+```sql
+CREATE INDEX idx_days_campaign_day_index
+  ON days (campaign_id, day_index);
+
+CREATE INDEX idx_events_campaign_start_day
+  ON events (campaign_id, start_day_index);
+
+CREATE INDEX idx_events_campaign_end_day
+  ON events (campaign_id, end_day_index);
+
+CREATE INDEX idx_events_campaign_temporal_state
+  ON events (campaign_id, temporal_state);
+
+CREATE INDEX idx_event_participants_event_id
+  ON event_participants (event_id);
+
+CREATE INDEX idx_event_participants_character_id
+  ON event_participants (character_id);
+```
+
+---
+
+## 9. Drizzle schema-shape
+
+Codex mag dit in Drizzle uitwerken, maar het moet inhoudelijk overeenkomen met bovenstaande SQL.
+
+Belangrijke eis:
+
+* snake_case in database
+* camelCase in TypeScript mapping
+
+---
+
+## 10. Repository interfaces
+
+Deze interfaces zijn de grens tussen application en persistence.
+
+## 10.1 CampaignRepository
+
+```ts
+export interface CampaignRepository {
+  getById(id: CampaignId): Promise<Campaign | null>;
+  create(campaign: Campaign): Promise<void>;
+  update(campaign: Campaign): Promise<void>;
+  setCurrentDay(campaignId: CampaignId, dayIndex: number): Promise<void>;
+}
+```
+
+## 10.2 CalendarRepository
+
+```ts
+export interface CalendarRepository {
+  getById(id: CalendarId): Promise<Calendar | null>;
+  create(calendar: Calendar): Promise<void>;
+}
+```
+
+## 10.3 DayRepository
+
+```ts
+export interface DayRepository {
+  getById(id: DayId): Promise<Day | null>;
+  getByCampaignAndDayIndex(campaignId: CampaignId, dayIndex: number): Promise<Day | null>;
+  create(day: Day): Promise<void>;
+  update(day: Day): Promise<void>;
+  getOrCreate(campaignId: CampaignId, dayIndex: number, displayLabel?: string | null): Promise<Day>;
+}
+```
+
+## 10.4 CharacterRepository
+
+```ts
+export interface CharacterRepository {
+  getById(id: CharacterId): Promise<Character | null>;
+  listByCampaign(campaignId: CampaignId): Promise<Character[]>;
+  create(character: Character): Promise<void>;
+  update(character: Character): Promise<void>;
+}
+```
+
+## 10.5 EventRepository
+
+```ts
+export interface EventRepository {
+  getById(id: EventId): Promise<Event | null>;
+  create(event: Event): Promise<void>;
+  update(event: Event): Promise<void>;
+  delete(eventId: EventId): Promise<void>;
+
+  listByCampaign(campaignId: CampaignId): Promise<Event[]>;
+  listStartingOnDay(campaignId: CampaignId, dayIndex: number): Promise<Event[]>;
+  listEndingOnDay(campaignId: CampaignId, dayIndex: number): Promise<Event[]>;
+  listActiveOnDay(campaignId: CampaignId, dayIndex: number): Promise<Event[]>;
+  listByCharacter(campaignId: CampaignId, characterId: CharacterId): Promise<Event[]>;
+}
+```
+
+## 10.6 EventParticipantRepository
+
+```ts
+export interface EventParticipantRepository {
+  create(participant: EventParticipant): Promise<void>;
+  createMany(participants: EventParticipant[]): Promise<void>;
+  deleteByEventId(eventId: EventId): Promise<void>;
+  listByEventId(eventId: EventId): Promise<EventParticipant[]>;
+  listByCharacterId(characterId: CharacterId): Promise<EventParticipant[]>;
+}
+```
+
+## 10.7 UnitOfWork / transaction boundary
+
+```ts
+export interface UnitOfWork {
+  runInTransaction<T>(fn: () => Promise<T>): Promise<T>;
+}
+```
+
+Dit is nodig voor:
+
+* createEvent + participants
+* advanceDay + getOrCreateDay
+* import workflows
+
+---
+
+## 11. Application DTO’s
+
+## 11.1 CreateCampaignInput
+
+```ts
+export interface CreateCampaignInput {
+  name: string;
+  calendar: {
+    name: string;
+    type: CalendarType;
+    configJson?: string;
+  };
+  currentDayIndex?: number;
+}
+```
+
+## 11.2 CreateCharacterInput
+
+```ts
+export interface CreateCharacterInput {
+  campaignId: CampaignId;
+  name: string;
+  kind: CharacterKind;
+  status?: CharacterStatus;
+  description?: string | null;
+  factionId?: string | null;
+  metadataJson?: string | null;
+}
+```
+
+## 11.3 CreateEventInput
+
+```ts
+export interface CreateEventInput {
+  campaignId: CampaignId;
+  title: string;
+  summary?: string | null;
+  description?: string | null;
+  eventType?: string | null;
+  startDayIndex: number;
+  endDayIndex?: number | null;
+  temporalState: EventTemporalState;
+  visibility?: EventVisibility;
+  locationId?: LocationId | null;
+  threadId?: ThreadId | null;
+  parentEventId?: EventId | null;
+  participants?: Array<{
+    characterId: CharacterId;
+    role: EventParticipantRole;
+    notes?: string | null;
+    isPrimary?: boolean;
+  }>;
+}
+```
+
+## 11.4 UpdateEventInput
+
+```ts
+export interface UpdateEventInput {
+  eventId: EventId;
+  title?: string;
+  summary?: string | null;
+  description?: string | null;
+  eventType?: string | null;
+  startDayIndex?: number;
+  endDayIndex?: number | null;
+  temporalState?: EventTemporalState;
+  visibility?: EventVisibility;
+  locationId?: LocationId | null;
+  threadId?: ThreadId | null;
+  parentEventId?: EventId | null;
+}
+```
+
+## 11.5 AdvanceDayInput
+
+```ts
+export interface AdvanceDayInput {
+  campaignId: CampaignId;
+}
+```
+
+## 11.6 Bulk shared event input
+
+```ts
+export interface CreateSharedEventInput {
+  campaignId: CampaignId;
+  title: string;
+  summary?: string | null;
+  description?: string | null;
+  startDayIndex: number;
+  endDayIndex?: number | null;
+  temporalState: EventTemporalState;
+  visibility?: EventVisibility;
+  participantIds: CharacterId[];
+  defaultRole?: EventParticipantRole;
+}
+```
+
+---
+
+## 12. Read models / query DTO’s
+
+## 12.1 EventWithParticipants
+
+```ts
+export interface EventWithParticipants {
+  event: Event;
+  participants: Array<{
+    participant: EventParticipant;
+    character: Character;
+  }>;
+}
+```
+
+## 12.2 DayOverview
+
+```ts
+export interface DayOverview {
+  day: Day;
+  startingEvents: EventWithParticipants[];
+  activeEvents: EventWithParticipants[];
+  endingEvents: EventWithParticipants[];
+}
+```
+
+## 12.3 CharacterTimelineEntry
+
+```ts
+export interface CharacterTimelineEntry {
+  event: Event;
+  participant: EventParticipant;
+}
+```
+
+## 12.4 CharacterTimeline
+
+```ts
+export interface CharacterTimeline {
+  character: Character;
+  entries: CharacterTimelineEntry[];
+}
+```
+
+---
+
+## 13. Application services / use cases
+
+## 13.1 CreateCampaignUseCase
+
+Verantwoordelijk voor:
+
+* calendar aanmaken
+* campaign aanmaken
+* current day initialiseren
+* eerste Day aanmaken
+
+## 13.2 AdvanceDayUseCase
+
+Verantwoordelijk voor:
+
+* current day ophalen
+* `+1`
+* opslaan
+* nieuwe Day maken indien nodig
+* Day retourneren
+
+## 13.3 CreateCharacterUseCase
+
+Verantwoordelijk voor:
+
+* input valideren
+* character maken
+* opslaan
+
+## 13.4 CreateEventUseCase
+
+Verantwoordelijk voor:
+
+* temporal validatie
+* event opslaan
+* participants opslaan
+* transactie gebruiken
+
+## 13.5 UpdateEventUseCase
+
+Verantwoordelijk voor:
+
+* event ophalen
+* wijzigingen toepassen
+* validatie
+* opslaan
+
+## 13.6 CancelEventUseCase
+
+Verantwoordelijk voor:
+
+* `temporalState = cancelled`
+* update
+
+## 13.7 CloseOngoingEventUseCase
+
+Verantwoordelijk voor:
+
+* endDayIndex zetten
+* temporalState = resolved
+* validatie
+
+## 13.8 GetDayOverviewUseCase
+
+Verantwoordelijk voor:
+
+* day ophalen of maken
+* start/active/end query’s combineren
+* participants hydrateren
+
+## 13.9 GetCharacterTimelineUseCase
+
+Verantwoordelijk voor:
+
+* character ophalen
+* events + participant roles ophalen
+* chronologisch sorteren
+
+## 13.10 ExportCampaignJsonUseCase
+
+Verantwoordelijk voor:
+
+* alle relevante records ophalen
+* portable JSON bouwen
+* schemaVersion toevoegen
+
+## 13.11 ImportCampaignJsonUseCase
+
+Verantwoordelijk voor:
+
+* schema validatie
+* referential integrity checks
+* transactional import
+* replace/new-campaign mode
+
+---
+
+## 14. Concrete use case signatures
+
+```ts
+export interface CreateCampaignUseCase {
+  execute(input: CreateCampaignInput): Promise<{ campaignId: CampaignId }>;
+}
+
+export interface AdvanceDayUseCase {
+  execute(input: AdvanceDayInput): Promise<{ day: Day; currentDayIndex: number }>;
+}
+
+export interface CreateCharacterUseCase {
+  execute(input: CreateCharacterInput): Promise<{ characterId: CharacterId }>;
+}
+
+export interface CreateEventUseCase {
+  execute(input: CreateEventInput): Promise<{ eventId: EventId }>;
+}
+
+export interface UpdateEventUseCase {
+  execute(input: UpdateEventInput): Promise<void>;
+}
+
+export interface GetDayOverviewUseCase {
+  execute(input: { campaignId: CampaignId; dayIndex: number }): Promise<DayOverview>;
+}
+
+export interface GetCharacterTimelineUseCase {
+  execute(input: { campaignId: CampaignId; characterId: CharacterId }): Promise<CharacterTimeline>;
+}
+```
+
+---
+
+## 15. Import/export schema
+
+## 15.1 Portable JSON envelope
+
+```ts
+export interface CampaignExportV1 {
+  schemaVersion: "1.0.0";
+  appVersion: string;
+  exportedAt: string;
+  campaign: Campaign;
+  calendars: Calendar[];
+  days: Day[];
+  characters: Character[];
+  events: Event[];
+  eventParticipants: EventParticipant[];
+  sessions: Session[];
+  locations: Location[];
+  threads: Thread[];
+}
+```
+
+## 15.2 Import modes
+
+```ts
+export type ImportMode = "replace" | "new_campaign";
+```
+
+## 15.3 Import result
+
+```ts
+export interface ImportResult {
+  success: boolean;
+  warnings: string[];
+  errors: string[];
+  importedCounts: {
+    campaigns: number;
+    calendars: number;
+    days: number;
+    characters: number;
+    events: number;
+    eventParticipants: number;
+    sessions: number;
+    locations: number;
+    threads: number;
+  };
+}
+```
+
+---
+
+## 16. Zod schema-eis
+
+Codex moet voor alle import/export DTO’s Zod-schema’s genereren, minimaal voor:
+
+* `CampaignExportV1`
+* `CreateCharacterInput`
+* `CreateEventInput`
+* `UpdateEventInput`
+
+Belangrijke regel:
+
+* application layer valideert input vóór repository writes.
+
+---
+
+## 17. Error model
+
+Gebruik géén losse throw-chaos in de application layer.
+Gebruik herkenbare domeinfouten.
+
+```ts
+export class ValidationError extends Error {}
+export class NotFoundError extends Error {}
+export class ConflictError extends Error {}
+export class ImportError extends Error {}
+```
+
+Voorbeeld:
+
+* event niet gevonden → `NotFoundError`
+* end day vóór start day → `ValidationError`
+* duplicate day → `ConflictError`
+
+---
+
+## 18. Eerste UI-contracten
+
+De UI hoeft de domeinlaag niet te kennen buiten use cases en read DTO’s.
+
+## 18.1 Dashboard needs
+
+* current campaign
+* current day index
+* current day label
+* active events
+* recent events
+
+## 18.2 Day View needs
+
+Input:
+
+* `campaignId`
+* `dayIndex`
+
+Output:
+
+* `DayOverview`
+
+## 18.3 Character Timeline needs
+
+Input:
+
+* `campaignId`
+* `characterId`
+
+Output:
+
+* `CharacterTimeline`
+
+---
+
+## 19. Minimal service boundaries
+
+Deze services mogen in `packages/application/src/services/`:
+
+* `IdService`
+* `ClockService`
+* `CalendarLabelService`
+
+## 19.1 IdService
+
+```ts
+export interface IdService {
+  newCampaignId(): CampaignId;
+  newCalendarId(): CalendarId;
+  newDayId(): DayId;
+  newCharacterId(): CharacterId;
+  newEventId(): EventId;
+  newEventParticipantId(): EventParticipantId;
+}
+```
+
+## 19.2 ClockService
+
+```ts
+export interface ClockService {
+  nowIso(): string;
+}
+```
+
+## 19.3 CalendarLabelService
+
+```ts
+export interface CalendarLabelService {
+  getDisplayLabel(calendar: Calendar, dayIndex: number): string;
+}
+```
+
+Voor v0.1 mag dit simpel zijn:
+
+* `"Day 123"`
+  of een rudimentaire FR/custom formatter.
+
+---
+
+## 20. Codex build order
+
+## Sprint 1
+
+Doel: datafundament.
+
+Taken:
+
+1. scaffold monorepo
+2. voeg packages toe
+3. implementeer domain types
+4. implementeer SQL/Drizzle schema
+5. implementeer repositories
+6. implementeer `createCampaign`
+7. implementeer `setCurrentDay`
+8. implementeer `advanceDay`
+9. implementeer minimale character CRUD
+10. implementeer minimale event CRUD
+
+## Sprint 2
+
+Doel: retrieval en timelines.
+
+Taken:
+
+1. implementeer event participants
+2. implementeer `createSharedEvent`
+3. implementeer `getDayOverview`
+4. implementeer `getActiveEventsForDay`
+5. implementeer `getCharacterTimeline`
+6. implementeer `closeOngoingEvent`
+
+## Sprint 3
+
+Doel: portability.
+
+Taken:
+
+1. Zod export schema’s
+2. JSON exporter
+3. JSON importer
+4. import validatie
+5. native snapshot export
+6. basis tests
+
+---
+
+## 21. Concrete acceptance tests voor Codex
+
+## Test A — create campaign
+
+* creëer campaign met currentDayIndex = 1
+* verwacht Day 1 record
+* verwacht linked calendar
+
+## Test B — advance day
+
+* current day 1
+* advance
+* verwacht current day 2
+* verwacht Day 2 record
+
+## Test C — create single-day event
+
+* start 2, end 2, resolved
+* verschijnt in `startingEvents`, `activeEvents`, `endingEvents` op dag 2
+
+## Test D — create multi-day event
+
+* start 5, end 8
+* actief op 5/6/7/8
+* niet actief op 9
+
+## Test E — create ongoing event
+
+* start 10, end null, ongoing
+* actief op 10/11/12
+* na close op 13 niet actief op 14
+
+## Test F — character timeline
+
+* character aan 3 events gekoppeld
+* timeline retourneert 3 entries in chronologische volgorde
+
+## Test G — export/import roundtrip
+
+* export dataset
+* importeer als nieuwe campaign
+* counts en relaties blijven intact
+
+---
+
+## 22. Wat Codex níet zelf mag verzinnen
+
+Deze keuzes liggen vast:
+
+* `day_index` is bron van waarheid
+* SQLite is primaire v0.1 datastore
+* string IDs met prefixes
+* repository pattern verplicht
+* events ondersteunen `single-day`, `multi-day`, `ongoing`
+* portable JSON export verplicht
+* domain/application los van UI
+* snake_case db / camelCase ts
+
+---
+
+## 23. Eerste repo-bestanden die jij straks wilt hebben
+
+```text
+docs/
+  platform-brief.md
+  event-module-spec-v0.1.md
+  implementation-brief-v0.1.md
+
+packages/domain/src/
+  ids.ts
+  enums.ts
+  types/campaign.ts
+  types/calendar.ts
+  types/day.ts
+  types/character.ts
+  types/event.ts
+  types/event-participant.ts
+  rules/event-rules.ts
+
+packages/application/src/
+  dto/create-event-input.ts
+  dto/update-event-input.ts
+  dto/day-overview.ts
+  dto/character-timeline.ts
+  use-cases/create-campaign.ts
+  use-cases/advance-day.ts
+  use-cases/create-event.ts
+  use-cases/get-day-overview.ts
+  use-cases/get-character-timeline.ts
+  services/id-service.ts
+  services/clock-service.ts
+  repositories/*.ts
+
+packages/db/src/
+  schema/*.ts
+  repositories/*.ts
+  migrations/*.sql
+
+packages/schemas/src/
+  zod/export-v1.ts
+  zod/create-event.ts
+  zod/update-event.ts
+
+packages/import-export/src/
+  exporters/export-campaign-json.ts
+  importers/import-campaign-json.ts
+```
