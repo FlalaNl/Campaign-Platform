@@ -1,0 +1,658 @@
+# Platform Brief — Campaign Platform
+
+## 1. Samenvatting
+
+**Campaign Platform** is een **local-first, uitbreidbaar campaign management platform** voor tabletop RPG’s en verwante creatieve projecten. Het platform moet op termijn dienen als centrale plek voor **tijdlijnbeheer, gebeurtenissen, characters, homebrew content, relaties tussen entiteiten, import/export en uitbreidbare plugins**.
+
+De **eerste verticale slice (v0.1)** richt zich uitsluitend op de **Event & Timeline Module**: een robuuste manier om dagen, gebeurtenissen en character-betrokkenheid bij te houden, inclusief **meerdaagse events** en **events zonder einddatum**.
+
+Het platform wordt vanaf het begin ontworpen als:
+
+* **module-based**
+* **plugin-ready**
+* **database-portable**
+* **Obsidian-agnostic**
+* **server-capable, maar niet server-dependent**
+
+De kernfilosofie is: **breed ontwerpen, smal bouwen**.
+
+---
+
+## 2. Productvisie
+
+Het platform moet uiteindelijk uitgroeien tot een **campaign operating system**: een systeem waarin een DM of worldbuilder niet alleen losse notities bewaart, maar de **state van de campaign** kan beheren.
+
+Het platform moet uiteindelijk kunnen omgaan met:
+
+* tijd en kalenderlogica
+* gebeurtenissen en causale lijnen
+* characters, NPC’s en PCs
+* locaties, factions, quests en threads
+* homebrew content zoals monsters, statblocks, items, spells en mechanics
+* koppelingen tussen al deze onderdelen
+* import/export naar andere systemen
+* uitbreidingen via plugins
+
+De app is dus niet bedoeld als een “mooie kalender”, maar als een **gestructureerde engine voor campaign state en narrative continuity**.
+
+---
+
+## 3. Probleem dat het platform oplost
+
+Bestaande tools lossen meestal maar één deel goed op:
+
+* kalenderweergave zonder sterke entity-relaties
+* notitietools zonder goede tijdslogica
+* character managers zonder eventgeschiedenis
+* homebrew tools zonder koppeling aan campaign context
+* VTT’s die te veel op encounter/play focussen en te weinig op campaign continuity
+
+Wat ontbreekt is een systeem waarin je tegelijk kunt zien:
+
+* **wat gebeurde op dag X**
+* **welke events op dat moment actief waren**
+* **wat character Y heeft meegemaakt**
+* **welke thread of locatie geraakt werd**
+* **hoe een campaign door keuzes veranderd is**
+
+Campaign Platform moet die lacune opvullen.
+
+---
+
+## 4. Doelgroep
+
+### Primaire gebruiker
+
+De primaire gebruiker is een:
+
+* Dungeon Master
+* GM
+* worldbuilder
+* campaign designer
+
+die behoefte heeft aan:
+
+* langdurige campaign continuity
+* snelle invoer van gebeurtenissen
+* rijke relaties tussen data
+* lokale controle over data
+* flexibiliteit voor homebrew en custom workflows
+
+### Secundaire gebruiker
+
+Later kan het platform ook relevant zijn voor:
+
+* schrijvers van settingmateriaal
+* co-DM’s
+* campaign archivists
+* spelers die een afgeslankte read-only of player-facing variant gebruiken
+
+---
+
+## 5. Productprincipes
+
+## 5.1 Local-first
+
+De gebruiker moet volledig lokaal kunnen werken zonder internetverbinding of externe server.
+
+## 5.2 Open data
+
+De data mag niet opgesloten zitten in een gesloten formaat. Import en export zijn first-class features.
+
+## 5.3 Platform boven app
+
+Dit is geen eenmalige event-tool, maar een uitbreidbare basis voor meerdere campaign modules.
+
+## 5.4 Modulaire opbouw
+
+Nieuwe domeinen zoals Characters, Homebrew en Plugins moeten later toegevoegd kunnen worden zonder de kern te breken.
+
+## 5.5 Server-capable
+
+De eerste versie mag volledig lokaal zijn, maar de architectuur moet een latere overstap naar server/API/web mogelijk maken.
+
+## 5.6 Obsidian-agnostic
+
+Obsidian mag later een exportdoel of integratiepunt zijn, maar niet de fundering van het systeem.
+
+## 5.7 Codex-friendly
+
+De architectuur, documentatie en buildvolgorde moeten geschikt zijn om later efficiënt met Codex verder te bouwen.
+
+---
+
+## 6. Productscope
+
+## 6.1 Platformscope
+
+Het platform omvat op hoog niveau:
+
+* Campaigns
+* Tijd / Kalender
+* Entiteiten
+* Events / Timeline
+* Import / Export
+* Modules
+* Plugins
+* Later: Homebrew / Characters / Sessions / Locations / Threads / Factions
+
+## 6.2 Eerste focus: v0.1
+
+De eerste versie bouwt slechts één module volledig uit:
+
+**Event & Timeline Management**
+
+Deze module moet:
+
+* dagen kunnen bijhouden
+* events aan dagen koppelen
+* events aan meerdere characters koppelen
+* charactergeschiedenis tonen
+* meerdaagse events ondersteunen
+* ongoing events zonder einddatum ondersteunen
+* data kunnen exporteren en importeren
+
+---
+
+## 7. Wat Campaign Platform expliciet niet is in v0.1
+
+De eerste versie is **niet**:
+
+* een VTT
+* een combat tracker
+* een map engine
+* een sync-platform
+* een multiplayer tool
+* een mobile app
+* een volledige homebrew builder
+* een character sheet manager
+* een plugin marketplace
+* een cloud-only systeem
+
+Die dingen kunnen later bestaan, maar horen niet bij de eerste verticale slice.
+
+---
+
+## 8. Kernconcepten
+
+De kern van het platform bestaat uit drie hoofdassen:
+
+### 8.1 Tijd
+
+De campaign kent een formele tijdsstructuur:
+
+* dagen
+* kalenderweergave
+* current day
+* tijdsverloop
+* events met begin en eind
+
+### 8.2 Entiteiten
+
+Het platform draait om objecten die in de campaign bestaan:
+
+* characters
+* locaties
+* factions
+* items
+* quests
+* homebrew content
+* etc.
+
+### 8.3 Records
+
+Gebeurtenissen, statussen en inhoud worden opgeslagen als gestructureerde records die gekoppeld zijn aan tijd en entiteiten.
+
+De eerste recordvorm is:
+
+* **Event**
+
+Later kunnen recordvormen worden toegevoegd, zoals:
+
+* session note
+* relationship state
+* item transfer
+* homebrew revision
+* quest progression
+
+---
+
+## 9. V0.1 Module: Event & Timeline
+
+## 9.1 Doel
+
+Een snelle, betrouwbare manier bieden om campaign events vast te leggen en terug te vinden.
+
+## 9.2 Functionele kern
+
+De module moet minstens deze vragen kunnen beantwoorden:
+
+* Welke events gebeurden op dag X?
+* Welke events waren actief op dag X?
+* Welke events heeft character Y meegemaakt?
+* Welke characters waren betrokken bij event Z?
+* Welke events zijn nog gaande?
+
+## 9.3 Vereisten
+
+De module moet:
+
+* single-day events ondersteunen
+* multi-day events ondersteunen
+* open-ended events ondersteunen
+* shared events voor meerdere characters ondersteunen
+* aparte characteracties op dezelfde dag ondersteunen
+* snel loggen mogelijk maken via een daily flow
+
+---
+
+## 10. Toekomstige modules
+
+Deze modules worden nu nog niet volledig gebouwd, maar het platform moet er architectonisch al ruimte voor hebben.
+
+### 10.1 Character Module
+
+Voor:
+
+* PCs en NPCs
+* metadata
+* relaties
+* status
+* import uit externe bronnen
+* timeline integratie
+
+### 10.2 Homebrew Module
+
+Voor:
+
+* monsters
+* items
+* spells
+* statblocks
+* custom mechanics
+* versies en herkomst
+
+### 10.3 Session Module
+
+Voor:
+
+* sessies koppelen aan in-world tijd
+* recap
+* live notes
+* sessie-resultaten
+
+### 10.4 World Module
+
+Voor:
+
+* locaties
+* factions
+* threads
+* quests
+* lore
+
+### 10.5 Plugin Module
+
+Voor:
+
+* uitbreidbare functionaliteit
+* custom importers/exporters
+* custom views
+* custom content types
+
+---
+
+## 11. Architectuurprincipes
+
+## 11.1 Lagenmodel
+
+De app moet worden opgezet in losse lagen:
+
+### Core / Domain
+
+Bevat:
+
+* types
+* domeinregels
+* tijdslogica
+* validatie van business rules
+
+### Application
+
+Bevat:
+
+* use cases
+* workflows
+* service-laag
+
+### Persistence
+
+Bevat:
+
+* database schema
+* migrations
+* repositories
+* adapters voor opslag
+
+### Interface
+
+Bevat:
+
+* desktop UI
+* later eventueel web UI
+* import/export schermen
+* dashboards en editors
+
+### Integration
+
+Bevat:
+
+* importers/exporters
+* plugin hooks
+* externe adapters
+
+## 11.2 Technologie-agnostische kern
+
+De businesslogica mag niet opgesloten raken in desktop-specifieke of UI-specifieke code.
+
+## 11.3 Storage abstraction
+
+De kern mag niet direct afhankelijk zijn van één opslagvorm. SQLite is de eerste implementatie, niet de enige mogelijke.
+
+---
+
+## 12. Datafilosofie
+
+## 12.1 Primaire datastore
+
+De eerste datastore is een **lokale SQLite database**.
+
+Redenen:
+
+* portable
+* single file
+* goed te back-uppen
+* geschikt voor relationele campaign-data
+* later nog steeds bruikbaar als native exportformaat
+
+## 12.2 Portable exports
+
+Naast de native database moet er altijd een **portable JSON export** mogelijk zijn.
+
+## 12.3 Human-readable exports
+
+Later moeten ook exports mogelijk zijn naar:
+
+* CSV
+* Markdown
+* Obsidian-vriendelijke output
+
+## 12.4 Geen lock-in
+
+De gebruiker moet de database kunnen:
+
+* back-uppen
+* dupliceren
+* exporteren
+* migreren
+* elders verwerken
+
+---
+
+## 13. Server-capable ontwerp
+
+Het platform start local-first, maar moet later kunnen doorgroeien naar:
+
+* een server op eigen Linux/Unraid machine
+* een API-laag
+* een webfrontend
+* eventueel centrale opslag of sync
+
+Daarom gelden nu al deze uitgangspunten:
+
+* geen businesslogica in desktop-shells verankeren
+* repositories abstraheren
+* import/exportcontracten formaliseren
+* domeinlogica los houden van transportlaag en UI
+
+Dit betekent:
+
+* **nu lokaal**
+* **later desgewenst hybride of server-based**
+* **zonder volledige herbouw van de kern**
+
+---
+
+## 14. Pluginfilosofie
+
+Plugins zijn geen nice-to-have achteraf, maar een ontwerpdoel.
+
+## 14.1 Waarom plugins
+
+Omdat de campaign-workflow per gebruiker sterk kan verschillen en het platform later breder moet kunnen worden dan alleen de officiële modules.
+
+## 14.2 Soorten plugins
+
+Later moet het platform minstens drie plugintypes kunnen ondersteunen:
+
+### UI plugins
+
+Toevoegen van:
+
+* dashboards
+* views
+* editors
+* panels
+
+### Data plugins
+
+Toevoegen van:
+
+* importers
+* exporters
+* schema converters
+* adapters naar andere tools
+
+### Domain plugins
+
+Toevoegen van:
+
+* nieuwe recordtypes
+* aanvullende validatieregels
+* custom commands
+* extensies op bestaande modules
+
+## 14.3 Pluginveiligheid
+
+Plugins moeten uiteindelijk via een gecontroleerd capability-model toegang krijgen tot:
+
+* data
+* filesystem
+* import/export
+* UI-haken
+
+---
+
+## 15. Import/exportfilosofie
+
+Import/export is een kernfeature, geen nagedachte.
+
+## 15.1 Doelen
+
+* backups mogelijk maken
+* migratie naar andere tools mogelijk maken
+* data-uitwisseling mogelijk maken
+* bulkimport later ondersteunen
+* platformonafhankelijkheid waarborgen
+
+## 15.2 Officiële exportvormen
+
+### Native export
+
+Volledige SQLite databasekopie.
+
+### Portable export
+
+Versieerbare JSON package van campaign data.
+
+### Structured exports
+
+CSV en later markdown/Obsidian.
+
+## 15.3 Officiële importvereisten
+
+Een importflow moet uiteindelijk ondersteunen:
+
+* validatie
+* dry run
+* schema version checks
+* conflict handling
+* merge of replace keuzes
+
+---
+
+## 16. Toekomstbeeld voor characters en homebrew
+
+De architectuur moet nu al ruimte laten voor twee belangrijke uitbreidingen:
+
+## 16.1 Character imports
+
+Characters moeten later kunnen worden:
+
+* handmatig aangemaakt
+* geïmporteerd uit externe bestanden of tools
+* gekoppeld aan events en andere entiteiten
+* geüpdatet met broninformatie en merge-logica
+
+## 16.2 Homebrew management
+
+Homebrew moet later niet slechts tekst zijn, maar gestructureerde content:
+
+* monsters
+* items
+* spells
+* statblocks
+* mechanics
+* revisions
+
+Homebrew moet koppelbaar worden aan:
+
+* events
+* characters
+* factions
+* sessions
+* locations
+* threads
+
+---
+
+## 17. UX-richting
+
+De UX moet uiteindelijk gericht zijn op **snel loggen, snel terugvinden, en relationeel denken**.
+
+### UX-principes
+
+* snel invoeren tijdens of vlak na een sessie
+* minimale frictie voor dagelijkse logging
+* krachtige filters voor terugzoeken
+* geen overdesign ten koste van snelheid
+* een duidelijke scheiding tussen “nu registreren” en “later structureren”
+
+### Eerste kernflows
+
+* advance day
+* daily log wizard
+* event aanmaken
+* event aan meerdere characters koppelen
+* day overview
+* character timeline
+
+---
+
+## 18. Succescriteria
+
+Het platform is in de eerste fase geslaagd als de gebruiker betrouwbaar kan:
+
+* een campaign starten
+* dagen laten passeren
+* events loggen
+* shared en individuele characterevents vastleggen
+* ongoing events beheren
+* terugvinden wat er op bepaalde dagen gebeurde
+* per character terugvinden wat die heeft meegemaakt
+* de data exporteren zonder lock-in
+
+Op platformniveau is het geslaagd als:
+
+* de kern los staat van de UI
+* de datastore vervangbaar is
+* modules uitbreidbaar zijn
+* import/export structureel in het ontwerp zit
+
+---
+
+## 19. Belangrijkste risico’s
+
+### 19.1 Te generiek ontwerpen
+
+Als alles vanaf dag 1 volledig generiek wordt gemaakt, wordt het model log en moeilijk te bouwen.
+
+### 19.2 Te hard op events optimaliseren
+
+Als de hele architectuur alleen om events draait, wordt later uitbreiden naar homebrew en andere modules pijnlijk.
+
+### 19.3 UI-first bouwen
+
+Als de eerste build te veel op schermen en te weinig op het domeinmodel leunt, krijg je later refactors in de fundering.
+
+### 19.4 Import/export onderschatten
+
+Als data portability niet vanaf het begin wordt meegenomen, ontstaat alsnog lock-in.
+
+### 19.5 Te vroeg sync/server willen
+
+Dat verhoogt de complexiteit sterk en levert in de eerste fase weinig extra waarde op.
+
+---
+
+## 20. Scopebewaking
+
+De juiste aanpak is:
+
+* **breed ontwerpen**
+* **smal implementeren**
+* **later uitbreiden in modules**
+
+Daarom geldt:
+
+* het platform wordt nu al gedefinieerd als breder dan events
+* de eerste implementatie blijft bewust beperkt tot de Event & Timeline Module
+
+---
+
+## 21. Formele productdefinitie
+
+**Campaign Platform** is een local-first, uitbreidbaar campaign management platform voor tabletop RPG’s en creatieve wereldbouw, ontworpen rond tijd, entiteiten, gebeurtenissen en contentrelaties, met open dataformaten, import/export als kernfunctionaliteit, en een architectuur die lokale desktopgebruikers nu ondersteunt zonder latere groei naar plugins, aanvullende modules of serverdeployments te blokkeren.
+
+---
+
+## 22. Besluit voor de volgende stap
+
+Op basis van deze brief wordt nu uitgegaan van:
+
+* **Productniveau:** Campaign Platform
+* **Eerste module:** Event & Timeline
+* **Architectuur:** local-first, plugin-ready, server-capable
+* **Opslagrichting:** SQLite + portable exports
+* **Toekomstige uitbreidingen:** Characters, Homebrew, Plugins
+* **Bouwstrategie:** eerst de platformbasis beschrijven, daarna de v0.1 module exact specificeren
+
+De logische volgende stap is nu:
+**de v0.1 Event Module Spec** uitschrijven met:
+
+* user stories
+* domeinmodel
+* temporal model
+* database schema
+* UI flows
+* acceptance criteria
