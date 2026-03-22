@@ -1,0 +1,14 @@
+{
+  "name": "@campaign-platform/db",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@campaign-platform/application": "workspace:*",
+    "@campaign-platform/domain": "workspace:*",
+    "drizzle-orm": "^0.44.7",
+    "sql.js": "^1.13.0"
+  }
+}
